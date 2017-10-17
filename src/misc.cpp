@@ -21,17 +21,6 @@
 #include <iomanip>
 
 
-std::string double_to_string(double n) {
-    std::stringstream ss;
-    ss << std::fixed << std::setprecision(2) << n;
-    std::string s = ss.str();
-    if (s.size() < 5)
-        return std::string(5 - s.size(), ' ') + ss.str();
-    else
-        return ss.str();
-}
-
-
 std::string int_to_string(long long n) {
     std::stringstream ss;
     ss.imbue(std::locale(""));
@@ -39,11 +28,7 @@ std::string int_to_string(long long n) {
     return ss.str();
 }
 
+
 void print_hash_progress(std::string filename, long long base_count) {
     std::cerr << "\r  " << filename << " (" << int_to_string(base_count) << " bp)";
-}
-
-
-void print_read_score_progress(int read_count, long long base_count) {
-    std::cerr << "\r  " << int_to_string(read_count) << " reads (" << int_to_string(base_count) << " bp)";
 }

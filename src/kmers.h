@@ -19,38 +19,37 @@
 
 #include <string>
 #include <vector>
-#include <unordered_set>
 #include <unordered_map>
-#include "bloom_filter.h"
 
 
 class Kmers
 {
 public:
-    Kmers();
-    ~Kmers();
+    Kmers(int kmer_size);
 
-    bool empty() {return m_kmers.size() == 0;}
-
-    void add_read_fastqs(std::vector<std::string> filenames);
-    void add_assembly_fasta(std::string filename);
+    void add_fastq(std::string filename, bool start, int margin);
+    void remove_low_depth_kmers(int min_depth);
+    void output_gfa();
     bool is_kmer_present(uint32_t kmer);
 
-    uint32_t starting_kmer_to_bits_forward(char * sequence);
-    uint32_t starting_kmer_to_bits_reverse(char * sequence);
+    uint32_t kmer_to_bits(char * sequence);
+    uint32_t kmer_to_bits(std::string sequence);
+    uint32_t base_to_bits(char base);
 
-    uint32_t base_to_bits_forward(char base);
-    uint32_t base_to_bits_reverse(char base);
+    std::string bits_to_kmer(uint32_t kmer);
+    char bits_to_base(uint32_t kmer);
 
 private:
-    std::unordered_set<uint32_t> m_kmers;
-    std::unordered_map<uint32_t, int> m_kmer_counts;
-    bloom_filter * bloom;
-    int required_kmer_copies;
+    size_t m_kmer_size;
+    std::unordered_map<uint32_t, int> m_kmers;
 
-    int add_reference(std::string filename, bool require_two_kmer_copies);
-    void add_kmer_require_one_copy(uint32_t kmer);
-    void add_kmer_require_multiple_copies(uint32_t kmer);
+    std::vector<uint32_t> get_upstream_kmers(uint32_t kmer);
+    std::vector<uint32_t> get_downstream_kmers(uint32_t kmer);
+
+    void print_segment_line(uint32_t kmer);
+    void print_link_line(uint32_t kmer_1, uint32_t kmer_2);
+
+    void add_kmer(uint32_t kmer);
 };
 
 

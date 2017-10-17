@@ -17,72 +17,29 @@
 #include "kmers.h"
 
 #include <iostream>
+#include <algorithm>
 #include <zlib.h>
-#include <stdio.h>
 #include "kseq.h"
 #include "misc.h"
 
 KSEQ_INIT(gzFile, gzread)
 
 
-Kmers::Kmers() {
-    bloom_parameters parameters;
-
-    // TO DO: it might be worth experimenting with these values to see how it affects time and memory usage.
-    parameters.projected_element_count = 100000000;
-    parameters.false_positive_probability = 0.0001; // 1 in 10000
-    parameters.random_seed = 0xA5A5A5A5;
-
-    parameters.compute_optimal_parameters();
-
-    //Instantiate Bloom Filter
-    bloom = new bloom_filter(parameters);
-
-    required_kmer_copies = 4;
+Kmers::Kmers(int kmer_size) {
+    m_kmer_size = size_t(kmer_size);
 }
 
 
-Kmers::~Kmers() {
-    delete bloom;
-}
+void Kmers::add_fastq(std::string filename, bool start, int margin) {
 
+    std::cerr << "Hashing " << m_kmer_size << "-mers from read ";
+    if (start)
+        std::cerr << "starts\n";
+    else  // end
+        std::cerr << "ends\n";
 
-void Kmers::add_read_fastqs(std::vector<std::string> filenames) {
-    std::cerr << "Hashing 16-mers from Illumina reads\n";
-
-    int sequence_count = 0;
-    for (auto & filename : filenames)
-        sequence_count += add_reference(filename, true);
-    std::cerr << "  " << int_to_string(sequence_count) << " reads, "
-              << int_to_string(m_kmers.size()) << " 16-mers\n\n";
-}
-
-
-void Kmers::add_assembly_fasta(std::string filename) {
-    std::cerr << "Hashing 16-mers from assembly\n";
-    std::cerr << "  " << filename << "\n";
-    int sequence_count = add_reference(filename, false);
-    std::string noun;
-    if (sequence_count == 1)
-        noun = "contig";
-    else
-        noun = "contigs";
-    std::cerr << "  " << int_to_string(sequence_count) << " " << noun << ", "
-              << int_to_string(m_kmers.size()) << " 16-mers\n\n";
-}
-
-
-int Kmers::add_reference(std::string filename, bool require_two_kmer_copies) {
     int l;
-    uint32_t forward_kmer, reverse_kmer;
     int sequence_count = 0;
-
-    // We'll use a different k-mer adding function for assembly hashing and read hashing.
-    void (Kmers::*add_kmer)(uint32_t);
-    if (require_two_kmer_copies)
-        add_kmer = &Kmers::add_kmer_require_multiple_copies;
-    else
-        add_kmer = &Kmers::add_kmer_require_one_copy;
 
     long long base_count = 0;
     long long last_progress = 0;
@@ -95,30 +52,21 @@ int Kmers::add_reference(std::string filename, bool require_two_kmer_copies) {
         else {
             ++sequence_count;
 
-            // Can't get a 16-mer from a sequence shorter than 16 bp.
-            if (seq->seq.l < 16)
-                continue;
-
             base_count += seq->seq.l;
             char * sequence = seq->seq.s;
 
-            // Build the starting k-mers from the first 16 bases.
-            forward_kmer = starting_kmer_to_bits_forward(sequence);
-            reverse_kmer = starting_kmer_to_bits_reverse(sequence);
-
-            (this->*add_kmer)(forward_kmer);
-            (this->*add_kmer)(reverse_kmer);
-
-            for (size_t i = 16; i < seq->seq.l; ++i) {
-                forward_kmer <<= 2;
-                forward_kmer |= base_to_bits_forward(sequence[i]);
-
-                reverse_kmer >>= 2;
-                reverse_kmer |= base_to_bits_reverse(sequence[i]);
-
-                (this->*add_kmer)(forward_kmer);
-                (this->*add_kmer)(reverse_kmer);
+            int range_start, range_end;
+            if (start) {
+                range_start = 0;
+                range_end = std::min(margin, int(seq->seq.l)) + 1 - int(m_kmer_size);
             }
+            else {  // end
+                range_start = std::max(int(seq->seq.l) - margin, 0);
+                range_end = int(seq->seq.l) + 1 - int(m_kmer_size);
+            }
+
+            for (int i = range_start; i < range_end; ++i)
+                add_kmer(kmer_to_bits(sequence + i));
 
             if (base_count - last_progress >= 483611) {  // a big prime number so progress updates don't round off
                 last_progress = base_count;
@@ -129,42 +77,18 @@ int Kmers::add_reference(std::string filename, bool require_two_kmer_copies) {
     kseq_destroy(seq);
     gzclose(fp);
     print_hash_progress(filename, base_count);
-    std::cerr << "\n";
-    return sequence_count;
+
+    std::cerr << "\n  " << int_to_string(sequence_count) << " reads, "
+              << int_to_string(int(m_kmers.size())) << " " << m_kmer_size << "-mers\n\n";
 }
 
 
-void Kmers::add_kmer_require_one_copy(uint32_t kmer) {
-    m_kmers.insert(kmer);
+void Kmers::add_kmer(uint32_t kmer) {
+    if (!is_kmer_present(kmer))
+        m_kmers[kmer] = 1;
+    else
+        ++m_kmers[kmer];
 }
-
-
-void Kmers::add_kmer_require_multiple_copies(uint32_t kmer) {
-    // If the kmer is already in the final set, then we can skip the rest of this function.
-    if (m_kmers.find(kmer) != m_kmers.end())
-        return;
-
-    // Check the bloom filter. If it's not in there, this is definitely the first time it's been seen.
-    if (!bloom->contains(kmer))
-        bloom->insert(kmer);
-
-    // If it's in the bloom filter, then it's probably been seen once before (though maybe not, based on the false
-    // positive rate of the bloom filter. Next we check the k-mer counts. If it's not in there, we say it's the second
-    // time the kmer's been seen.
-    else if (m_kmer_counts.find(kmer) == m_kmer_counts.end())
-        m_kmer_counts[kmer] = 2;
-
-    // If the k-mer is in the counts, then we increment its count. If the count is high enough, we add it to the k-mer
-    // set (and remove it from the counts to save some memory).
-    else {
-        int times_seen = ++m_kmer_counts[kmer];
-        if (times_seen >= required_kmer_copies) {
-            m_kmers.insert(kmer);
-            m_kmer_counts.erase(kmer);
-        }
-    }
-}
-
 
 
 bool Kmers::is_kmer_present(uint32_t kmer) {
@@ -172,8 +96,7 @@ bool Kmers::is_kmer_present(uint32_t kmer) {
 }
 
 
-
-uint32_t Kmers::base_to_bits_forward(char base) {
+uint32_t Kmers::base_to_bits(char base) {
     switch (base) {
         case 'A':
             return 0;  // 00000000000000000000000000000000
@@ -191,49 +114,157 @@ uint32_t Kmers::base_to_bits_forward(char base) {
             return 2;
         case 't':
             return 3;
-    }
-    return 0;
-}
-
-
-uint32_t Kmers::base_to_bits_reverse(char base) {
-    switch (base) {
-        case 'T':
-            return 0;           // 00000000000000000000000000000000
-        case 'G':
-            return 1073741824;  // 01000000000000000000000000000000
-        case 'C':
-            return 2147483648;  // 10000000000000000000000000000000
-        case 'A':
-            return 3221225472;  // 11000000000000000000000000000000
-        case 't':
+        default:
             return 0;
-        case 'g':
-            return 1073741824;
-        case 'c':
-            return 2147483648;
-        case 'a':
-            return 3221225472;
     }
-    return 0;
+}
+
+char Kmers::bits_to_base(uint32_t bits) {
+    switch (bits) {
+        case 0:
+            return 'A';
+        case 1:
+            return 'C';
+        case 2:
+            return 'G';
+        case 3:
+            return 'T';
+        default:
+            return 'A';
+    }
 }
 
 
-uint32_t Kmers::starting_kmer_to_bits_forward(char * sequence) {
+uint32_t Kmers::kmer_to_bits(char * sequence) {
     uint32_t kmer = 0;
-    for (int i = 0; i < 16; ++i) {
+    for (size_t i = 0; i < m_kmer_size; ++i) {
         kmer <<= 2;
-        kmer |= base_to_bits_forward(sequence[i]);
+        kmer |= base_to_bits(sequence[i]);
     }
     return kmer;
 }
 
 
-uint32_t Kmers::starting_kmer_to_bits_reverse(char * sequence) {
+uint32_t Kmers::kmer_to_bits(std::string sequence) {
     uint32_t kmer = 0;
-    for (int i = 0; i < 16; ++i) {
-        kmer >>= 2;
-        kmer |= base_to_bits_reverse(sequence[i]);
+    for (size_t i = 0; i < m_kmer_size; ++i) {
+        kmer <<= 2;
+        kmer |= base_to_bits(sequence[i]);
     }
     return kmer;
+}
+
+
+std::string Kmers::bits_to_kmer(uint32_t bits) {
+    std::string kmer;
+    for (size_t i = 0; i < m_kmer_size; ++i) {
+        kmer.insert(0, 1, bits_to_base(bits % 4));
+        bits >>= 2;
+    }
+    return kmer;
+}
+
+
+void Kmers::remove_low_depth_kmers(int min_depth) {
+    std::cerr << "Removing low-depth " << m_kmer_size << "-mers\n";
+
+    std::vector<uint32_t> kmers_to_remove;
+    for (auto kv : m_kmers) {
+        uint32_t kmer = kv.first;
+        int count = kv.second;
+        if (count < min_depth)
+            kmers_to_remove.push_back(kmer);
+    }
+
+    for (auto kmer : kmers_to_remove)
+        m_kmers.erase(kmer);
+
+    std::cerr << "  " << int_to_string(int(m_kmers.size())) << " " << m_kmer_size << "-mers remain\n";
+}
+
+
+void Kmers::output_gfa() {
+    std::vector<uint32_t> all_kmers;
+    for (auto kv : m_kmers)
+        all_kmers.push_back(kv.first);
+    std::sort(all_kmers.begin(), all_kmers.end());
+
+    for (auto kmer : all_kmers)
+        print_segment_line(kmer);
+    for (auto kmer : all_kmers) {
+        for (auto next : get_downstream_kmers(kmer))
+            print_link_line(kmer, next);
+    }
+}
+
+
+void Kmers::print_segment_line(uint32_t kmer) {
+    std::cout << "S\t" << kmer << "\t" << bits_to_kmer(kmer) << "\tdp:f:" << m_kmers[kmer] << "\n";
+}
+
+
+void Kmers::print_link_line(uint32_t kmer_1, uint32_t kmer_2) {
+    std::cout << "L\t";
+    std::cout << kmer_1 << "\t+\t";
+    std::cout << kmer_2 << "\t+\t";
+    uint32_t overlap = m_kmer_size - 1;
+    std::cout << overlap << "M\t\n";
+}
+
+
+std::vector<uint32_t> Kmers::get_upstream_kmers(uint32_t kmer) {
+    std::string kmer_string = bits_to_kmer(kmer);
+    kmer_string.pop_back();
+
+    std::string next_1 = 'A' + kmer_string;
+    std::string next_2 = 'C' + kmer_string;
+    std::string next_3 = 'G' + kmer_string;
+    std::string next_4 = 'T' + kmer_string;
+
+    uint32_t next_1_bits = kmer_to_bits(next_1);
+    uint32_t next_2_bits = kmer_to_bits(next_2);
+    uint32_t next_3_bits = kmer_to_bits(next_3);
+    uint32_t next_4_bits = kmer_to_bits(next_4);
+
+    std::vector<uint32_t> upstream_kmers;
+
+    if (is_kmer_present(next_1_bits))
+        upstream_kmers.push_back(next_1_bits);
+    if (is_kmer_present(next_2_bits))
+        upstream_kmers.push_back(next_2_bits);
+    if (is_kmer_present(next_3_bits))
+        upstream_kmers.push_back(next_3_bits);
+    if (is_kmer_present(next_4_bits))
+        upstream_kmers.push_back(next_4_bits);
+
+    return upstream_kmers;
+}
+
+
+std::vector<uint32_t> Kmers::get_downstream_kmers(uint32_t kmer) {
+    std::string kmer_string = bits_to_kmer(kmer);
+    kmer_string.erase(0, 1);
+
+    std::string next_1 = kmer_string + 'A';
+    std::string next_2 = kmer_string + 'C';
+    std::string next_3 = kmer_string + 'G';
+    std::string next_4 = kmer_string + 'T';
+
+    uint32_t next_1_bits = kmer_to_bits(next_1);
+    uint32_t next_2_bits = kmer_to_bits(next_2);
+    uint32_t next_3_bits = kmer_to_bits(next_3);
+    uint32_t next_4_bits = kmer_to_bits(next_4);
+
+    std::vector<uint32_t> downstream_kmers;
+
+    if (is_kmer_present(next_1_bits))
+        downstream_kmers.push_back(next_1_bits);
+    if (is_kmer_present(next_2_bits))
+        downstream_kmers.push_back(next_2_bits);
+    if (is_kmer_present(next_3_bits))
+        downstream_kmers.push_back(next_3_bits);
+    if (is_kmer_present(next_4_bits))
+        downstream_kmers.push_back(next_4_bits);
+
+    return downstream_kmers;
 }

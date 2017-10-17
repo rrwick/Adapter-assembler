@@ -18,7 +18,6 @@
 
 #include <iostream>
 #include <sys/ioctl.h>
-#include <stdio.h>
 #include <unistd.h>
 #include <fstream>
 
@@ -43,7 +42,7 @@ struct DoublesReader
 
 
 typedef args::ValueFlag<double, DoublesReader> d_arg;
-typedef args::ValueFlag<long long> i_arg;
+typedef args::ValueFlag<int> i_arg;
 typedef args::ValueFlag<std::string> s_arg;
 typedef args::Flag f_arg;
 
@@ -77,14 +76,24 @@ Arguments::Arguments(int argc, char **argv) {
 
 
     i_arg kmer_arg(parser, "int",
-                   "k-mer size used for assembly (default: 10)",
-                   {'k', "kmer"}, 10);
+                   "k-mer size used for assembly (default: 7)",
+                   {'k', "kmer"}, 7);
     i_arg min_depth_arg(parser, "int",
                    "k-mers with depth lower than this will be filtered out (default: 10)",
-                   {'m', "min_depth"}, 10);
+                   {'d', "min_depth"}, 10);
+    i_arg margin_arg(parser, "int",
+                     "number of bases to use on end of read (default: 250)",
+                     {'m', "margin"}, 250);
+
+    f_arg start_arg(parser, "start",
+                   "assemble bases from starts of reads",
+                   {"start"});
+    f_arg end_arg(parser, "end",
+                   "assemble bases from ends of reads",
+                   {"end"});
 
     args::Positional<std::string> input_reads_arg(parser, "input_reads",
-                                      "input long reads for adapter assembly");
+                                                  "input long reads for adapter assembly");
 
     f_arg version_arg(parser, "version",
                       "display the program version and quit",
@@ -132,6 +141,18 @@ Arguments::Arguments(int argc, char **argv) {
     }
     if (!does_file_exist(input_reads)) {
         std::cerr << "Error: cannot find file: " << input_reads << "\n";
+        parsing_result = BAD;
+        return;
+    }
+
+    kmer = args::get(kmer_arg);
+    min_depth = args::get(min_depth_arg);
+    margin = args::get(margin_arg);
+    start = args::get(start_arg);
+    end = args::get(end_arg);
+
+    if (start == end) {
+        std::cerr << "Error: either --start or --end must be used (but not both)\n";
         parsing_result = BAD;
         return;
     }

@@ -18,10 +18,8 @@
 
 #include <string>
 
-std::string double_to_string(double n);
 std::string int_to_string(long long n);
 void print_hash_progress(std::string filename, long long base_count);
-void print_read_score_progress(int read_count, long long base_count);
 
 
 #endif // MISC_H

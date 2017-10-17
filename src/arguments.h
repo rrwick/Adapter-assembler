@@ -33,36 +33,11 @@ public:
 
     std::string input_reads;
 
-    bool target_bases_set;
-    long long target_bases;
-
-    bool keep_percent_set;
-    double keep_percent;
-
-    bool min_length_set;
-    int min_length;
-
-    bool min_mean_q_set;
-    double min_mean_q;
-
-    bool min_window_q_set;
-    double min_window_q;
-
-    bool assembly_set;
-    std::string assembly;
-    std::vector<std::string> illumina_reads;
-
-    double length_weight;
-    double mean_q_weight;
-    double window_q_weight;
-
-    bool trim;
-
-    bool split_set;
-    int split;
-
-    int window_size;
-    bool verbose;
+    int kmer;
+    int min_depth;
+    int margin;
+    bool start;
+    bool end;
 
 
 private:
