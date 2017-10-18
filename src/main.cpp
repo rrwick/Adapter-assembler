@@ -40,7 +40,8 @@ int main(int argc, char **argv)
     std::cerr << "\n";
 
     Kmers kmers(args.kmer);
-    kmers.add_fastq(args.input_reads, args.start, args.margin);
+    for (auto read_file : args.input_reads)
+        kmers.add_fastq(read_file, args.start, args.margin);
 
     int max_depth = kmers.get_max_depth();
     std::cerr << "Maximum depth: " << max_depth << "\n";

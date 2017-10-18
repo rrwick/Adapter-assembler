@@ -43,7 +43,6 @@ struct DoublesReader
 
 typedef args::ValueFlag<double, DoublesReader> d_arg;
 typedef args::ValueFlag<int> i_arg;
-typedef args::ValueFlag<std::string> s_arg;
 typedef args::Flag f_arg;
 
 
@@ -91,8 +90,8 @@ Arguments::Arguments(int argc, char **argv) {
                    "assemble bases from ends of reads",
                    {"end"});
 
-    args::Positional<std::string> input_reads_arg(parser, "input_reads",
-                                                  "input long reads for adapter assembly");
+    args::PositionalList<std::string> input_reads_arg(parser, "input_reads",
+                                                      "input long reads for adapter assembly");
 
     f_arg version_arg(parser, "version",
                       "display the program version and quit",
@@ -132,16 +131,20 @@ Arguments::Arguments(int argc, char **argv) {
         return;
     }
 
-    input_reads = args::get(input_reads_arg);
+    for (const auto read_file : args::get(input_reads_arg))
+        input_reads.push_back(read_file);
+
     if (input_reads.empty()) {
         std::cerr << "Error: input reads are required" << "\n";
         parsing_result = BAD;
         return;
     }
-    if (!does_file_exist(input_reads)) {
-        std::cerr << "Error: cannot find file: " << input_reads << "\n";
-        parsing_result = BAD;
-        return;
+    for (auto read_file : input_reads) {
+        if (!does_file_exist(read_file)) {
+            std::cerr << "Error: cannot find file: " << read_file << "\n";
+            parsing_result = BAD;
+            return;
+        }
     }
 
     kmer = args::get(kmer_arg);

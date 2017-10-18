@@ -32,11 +32,11 @@ Kmers::Kmers(int kmer_size) {
 
 void Kmers::add_fastq(std::string filename, bool start, int margin) {
 
-    std::cerr << "Hashing " << m_kmer_size << "-mers from read ";
+    std::cerr << "Hashing " << m_kmer_size << "-mers from " << filename;
     if (start)
-        std::cerr << "starts\n";
+        std::cerr << " starts\n";
     else  // end
-        std::cerr << "ends\n";
+        std::cerr << " ends\n";
 
     int l;
     int sequence_count = 0;
