@@ -74,20 +74,20 @@ Arguments::Arguments(int argc, char **argv) {
     parser.helpParams.eachgroupindent = indent_size;
 
     i_arg kmer_arg(parser, "int",
-                   "k-mer size used for assembly (default: 10)",
+                   "k-mer size for assembly (default: 10)",
                    {'k', "kmer"}, 10);
     d_arg filter_depth_arg(parser, "float",
                    "k-mers with depth lower than this fraction of the max depth will be filtered out (default: 0.05)",
                    {'d', "filter_depth"}, 0.05);
     i_arg margin_arg(parser, "int",
-                     "number of bases to use on end of read (default: 250)",
+                     "number of bases to use from start/end of read (default: 250)",
                      {'m', "margin"}, 250);
 
     f_arg start_arg(parser, "start",
-                   "assemble bases from starts of reads",
+                   "assemble bases from start of reads",
                    {"start"});
     f_arg end_arg(parser, "end",
-                   "assemble bases from ends of reads",
+                   "assemble bases from end of reads",
                    {"end"});
 
     args::PositionalList<std::string> input_reads_arg(parser, "input_reads",

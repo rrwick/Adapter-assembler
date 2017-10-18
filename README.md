@@ -71,11 +71,11 @@ positional arguments:
     input_reads...                      input long reads for adapter assembly
 
 optional arguments:
-    -k[int], --kmer [int]               k-mer size used for assembly (default: 10)
+    -k[int], --kmer [int]               k-mer size for assembly (default: 10)
     -d[float], --filter_depth [float]   k-mers with depth lower than this fraction of the max depth will be filtered out (default: 0.05)
-    -m[int], --margin [int]             number of bases to use on end of read (default: 250)
-    --start                             assemble bases from starts of reads
-    --end                               assemble bases from ends of reads
+    -m[int], --margin [int]             number of bases to use from start/end of read (default: 250)
+    --start                             assemble bases from start of reads
+    --end                               assemble bases from end of reads
     --version                           display the program version and quit
 
     -h, --help                          display this help menu
