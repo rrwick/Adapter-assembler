@@ -27,8 +27,14 @@ class Kmers
 public:
     Kmers(int kmer_size);
 
+    int get_kmer_count() {return int(m_kmers.size());}
+    int get_max_depth();
+
     void add_fastq(std::string filename, bool start, int margin);
     void remove_low_depth_kmers(int min_depth);
+    void remove_tips();
+    void remove_large_diff();
+    void remove_singletons();
     void output_gfa();
     bool is_kmer_present(uint32_t kmer);
 

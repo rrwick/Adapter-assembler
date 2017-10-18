@@ -74,13 +74,12 @@ Arguments::Arguments(int argc, char **argv) {
     parser.helpParams.flagindent = indent_size;
     parser.helpParams.eachgroupindent = indent_size;
 
-
     i_arg kmer_arg(parser, "int",
-                   "k-mer size used for assembly (default: 7)",
-                   {'k', "kmer"}, 7);
-    i_arg min_depth_arg(parser, "int",
-                   "k-mers with depth lower than this will be filtered out (default: 10)",
-                   {'d', "min_depth"}, 10);
+                   "k-mer size used for assembly (default: 10)",
+                   {'k', "kmer"}, 10);
+    d_arg filter_depth_arg(parser, "float",
+                   "k-mers with depth lower than this fraction of the max depth will be filtered out (default: 0.05)",
+                   {'d', "filter_depth"}, 0.05);
     i_arg margin_arg(parser, "int",
                      "number of bases to use on end of read (default: 250)",
                      {'m', "margin"}, 250);
@@ -146,7 +145,7 @@ Arguments::Arguments(int argc, char **argv) {
     }
 
     kmer = args::get(kmer_arg);
-    min_depth = args::get(min_depth_arg);
+    filter_depth = args::get(filter_depth_arg);
     margin = args::get(margin_arg);
     start = args::get(start_arg);
     end = args::get(end_arg);

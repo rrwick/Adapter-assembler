@@ -34,7 +34,7 @@ public:
     std::string input_reads;
 
     int kmer;
-    int min_depth;
+    double filter_depth;
     int margin;
     bool start;
     bool end;

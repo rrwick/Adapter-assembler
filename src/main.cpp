@@ -20,6 +20,7 @@
 
 #include "arguments.h"
 #include "kmers.h"
+#include "misc.h"
 
 #define PROGRAM_VERSION "0.1.0"
 
@@ -40,7 +41,32 @@ int main(int argc, char **argv)
 
     Kmers kmers(args.kmer);
     kmers.add_fastq(args.input_reads, args.start, args.margin);
-    kmers.remove_low_depth_kmers(args.min_depth);
+
+    int max_depth = kmers.get_max_depth();
+    std::cerr << "Maximum depth: " << max_depth << "\n";
+    auto filter_depth = int(max_depth * args.filter_depth);
+    std::cerr << "Filter depth:  " << filter_depth << "\n\n";
+
+
+    std::cerr << "Cleaning step                      Remaining " << args.kmer << "-mers\n";
+    std::cerr << "-------------------------------------------------------\n";
+
+    std::cerr << "remove low-depth nodes             ";
+    kmers.remove_low_depth_kmers(filter_depth);
+    std::cerr << int_to_string(kmers.get_kmer_count()) << "\n";
+
+    std::cerr << "prune tips                         ";
+    kmers.remove_tips();
+    std::cerr << int_to_string(kmers.get_kmer_count()) << "\n";
+
+    std::cerr << "remove large differences           ";
+    kmers.remove_large_diff();
+    std::cerr << int_to_string(kmers.get_kmer_count()) << "\n";
+
+    std::cerr << "remove singletons                  ";
+    kmers.remove_singletons();
+    std::cerr << int_to_string(kmers.get_kmer_count()) << "\n";
+
     kmers.output_gfa();
 
     std::cerr << "\n";

@@ -19,6 +19,7 @@
 #include <string>
 
 std::string int_to_string(long long n);
+
 void print_hash_progress(std::string filename, long long base_count);
 
 

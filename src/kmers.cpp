@@ -166,8 +166,6 @@ std::string Kmers::bits_to_kmer(uint32_t bits) {
 
 
 void Kmers::remove_low_depth_kmers(int min_depth) {
-    std::cerr << "Removing low-depth " << m_kmer_size << "-mers\n";
-
     std::vector<uint32_t> kmers_to_remove;
     for (auto kv : m_kmers) {
         uint32_t kmer = kv.first;
@@ -175,11 +173,8 @@ void Kmers::remove_low_depth_kmers(int min_depth) {
         if (count < min_depth)
             kmers_to_remove.push_back(kmer);
     }
-
     for (auto kmer : kmers_to_remove)
         m_kmers.erase(kmer);
-
-    std::cerr << "  " << int_to_string(int(m_kmers.size())) << " " << m_kmer_size << "-mers remain\n";
 }
 
 
@@ -267,4 +262,88 @@ std::vector<uint32_t> Kmers::get_downstream_kmers(uint32_t kmer) {
         downstream_kmers.push_back(next_4_bits);
 
     return downstream_kmers;
+}
+
+
+int Kmers::get_max_depth() {
+    int max_depth = 0;
+    for (auto kv : m_kmers)
+        max_depth = std::max(max_depth, kv.second);
+    return max_depth;
+}
+
+
+void Kmers::remove_tips() {
+    std::vector<uint32_t> kmers_to_remove;
+    for (auto kv : m_kmers) {
+        uint32_t kmer = kv.first;
+        int count = kv.second;
+
+        std::vector<uint32_t> upstream = get_upstream_kmers(kmer);
+        std::vector<uint32_t> downstream = get_downstream_kmers(kmer);
+
+        if (downstream.empty()) {
+            int max_upstream_count = 0;
+            for (auto upstream_kmer : upstream)
+                max_upstream_count = std::max(max_upstream_count, m_kmers[upstream_kmer]);
+            if (max_upstream_count > count * 2)
+                kmers_to_remove.push_back(kmer);
+        }
+
+        else if (upstream.empty()) {
+            int max_downstream_count = 0;
+            for (auto downstream_kmer : downstream)
+                max_downstream_count = std::max(max_downstream_count, m_kmers[downstream_kmer]);
+            if (max_downstream_count > count * 2)
+                kmers_to_remove.push_back(kmer);
+        }
+    }
+
+    for (auto kmer : kmers_to_remove)
+        m_kmers.erase(kmer);
+}
+
+
+void Kmers::remove_large_diff() {
+    std::vector<uint32_t> kmers_to_remove;
+    for (auto kv : m_kmers) {
+        uint32_t kmer = kv.first;
+        int count = kv.second;
+
+        std::vector<uint32_t> neighbours = get_upstream_kmers(kmer);
+        std::vector<uint32_t> downstream = get_downstream_kmers(kmer);
+        neighbours.insert(neighbours.end(), downstream.begin(), downstream.end());
+
+        int max_neighbour_count = 0;
+        for (auto neighbour : neighbours)
+            max_neighbour_count = std::max(max_neighbour_count, m_kmers[neighbour]);
+        if (max_neighbour_count > count * 5)
+            kmers_to_remove.push_back(kmer);
+    }
+
+    for (auto kmer : kmers_to_remove)
+        m_kmers.erase(kmer);
+}
+
+
+void Kmers::remove_singletons() {
+    std::vector<uint32_t> kmers_to_remove;
+    for (auto kv : m_kmers) {
+        uint32_t kmer = kv.first;
+
+        std::vector<uint32_t> neighbours = get_upstream_kmers(kmer);
+        std::vector<uint32_t> downstream = get_downstream_kmers(kmer);
+        neighbours.insert(neighbours.end(), downstream.begin(), downstream.end());
+
+        int num_neighbours = 0;
+        for (auto neighbour : neighbours) {
+            if (neighbour != kmer)
+                num_neighbours += 1;
+        }
+        if (num_neighbours == 0)
+            kmers_to_remove.push_back(kmer);
+    }
+
+    for (auto kmer : kmers_to_remove)
+        m_kmers.erase(kmer);
 }
