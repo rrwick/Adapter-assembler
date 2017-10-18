@@ -153,6 +153,24 @@ Arguments::Arguments(int argc, char **argv) {
     start = args::get(start_arg);
     end = args::get(end_arg);
 
+    if (kmer < 4 || kmer > 16) {
+        std::cerr << "Error: --kmer must be between 4 and 16 (inclusive)\n";
+        parsing_result = BAD;
+        return;
+    }
+
+    if (filter_depth < 0.0 || filter_depth > 1.0) {
+        std::cerr << "Error: --filter_depth must be between 0 and 1 (inclusive)\n";
+        parsing_result = BAD;
+        return;
+    }
+
+    if (margin < kmer) {
+        std::cerr << "Error: --margin cannot be less than --kmer\n";
+        parsing_result = BAD;
+        return;
+    }
+
     if (start == end) {
         std::cerr << "Error: either --start or --end must be used (but not both)\n";
         parsing_result = BAD;
