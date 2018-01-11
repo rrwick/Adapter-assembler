@@ -105,6 +105,7 @@ uint32_t Kmers::base_to_bits(char base) {
         case 'G':
             return 2;  // 00000000000000000000000000000010
         case 'T':
+        case 'U':
             return 3;  // 00000000000000000000000000000011
         case 'a':
             return 0;
@@ -113,11 +114,13 @@ uint32_t Kmers::base_to_bits(char base) {
         case 'g':
             return 2;
         case 't':
+        case 'u':
             return 3;
         default:
             return 0;
     }
 }
+
 
 char Kmers::bits_to_base(uint32_t bits) {
     switch (bits) {
